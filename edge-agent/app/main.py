@@ -52,6 +52,9 @@ class IngestRequest(BaseModel):
     content: str = Field(..., min_length=1)
     category: str = "note"
     private: bool = False
+    # Optional explicit id — lets you re-write an existing point to demo the
+    # conflict resolver (edit the same note id locally vs. on the server).
+    point_id: Optional[str] = None
     extra_payload: Optional[Dict[str, Any]] = None
 
 
@@ -72,6 +75,7 @@ def ingest(req: IngestRequest) -> Dict[str, Any]:
         content=req.content,
         category=req.category,
         private=req.private,
+        point_id=req.point_id,
         extra_payload=req.extra_payload,
     )
     return {"ok": True, **result}

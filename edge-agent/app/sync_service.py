@@ -210,54 +210,53 @@ class SyncService:
         if not pending:
             return 0
 
-        self._ensure_collection()
+        # Only open a sync_event when there is actual work to log.
+        event_id = metadata.start_sync_event()
+        start = time.perf_counter()
+        status = "success"
         to_write: List[Any] = []
         synced_ids: List[str] = []
-        for p in pending:
-            if not self._resolve_conflict(p, client):
-                # Server wins: still mark local as synced so we stop retrying,
-                # but do not overwrite the server.
-                synced_ids.append(str(p["id"]))
-                continue
-            to_write.append(
-                models.PointStruct(
-                    id=str(p["id"]),
-                    vector={settings.vector_name: p["vector"]},
-                    payload={**p["payload"], "origin": "synced", "sync_state": "synced"},
+        try:
+            self._ensure_collection()
+            for p in pending:
+                if not self._resolve_conflict(p, client):
+                    # Server wins: still mark local synced so we stop retrying,
+                    # but do not overwrite the server.
+                    synced_ids.append(str(p["id"]))
+                    continue
+                to_write.append(
+                    models.PointStruct(
+                        id=str(p["id"]),
+                        vector={settings.vector_name: p["vector"]},
+                        payload={**p["payload"], "origin": "synced", "sync_state": "synced"},
+                    )
                 )
+                synced_ids.append(str(p["id"]))
+
+            if to_write:
+                client.upsert(collection_name=settings.collection_name, points=to_write)
+            memory.mark_synced(synced_ids)
+
+            with self.state.lock:
+                self.state.pushed_total += len(to_write)
+                self.state.last_push = _now_iso()
+            activity.record("sync", f"Pushed {len(to_write)} point(s) to cloud")
+        except Exception as exc:
+            status = "failed"
+            with self.state.lock:
+                self.state.last_error = str(exc)
+            activity.record("error", "Push failed", error=str(exc))
+        finally:
+            metadata.finish_sync_event(
+                event_id, len(to_write), 0,
+                int((time.perf_counter() - start) * 1000), status,
             )
-            synced_ids.append(str(p["id"]))
-
-        if to_write:
-            client.upsert(collection_name=settings.collection_name, points=to_write)
-        memory.mark_synced(synced_ids)
-
-        with self.state.lock:
-            self.state.pushed_total += len(to_write)
-            self.state.last_push = _now_iso()
-        activity.record("sync", f"Pushed {len(to_write)} point(s) to cloud")
         return len(to_write)
 
     def _push_loop(self) -> None:
         while not self._stop.is_set():
             if self.state.online:
-                event_id = metadata.start_sync_event()
-                start = time.perf_counter()
-                pushed = 0
-                status = "success"
-                try:
-                    pushed = self.push_once()
-                except Exception as exc:
-                    status = "failed"
-                    with self.state.lock:
-                        self.state.last_error = str(exc)
-                    activity.record("error", "Push failed", error=str(exc))
-                finally:
-                    if event_id and pushed >= 0:
-                        metadata.finish_sync_event(
-                            event_id, pushed, 0,
-                            int((time.perf_counter() - start) * 1000), status,
-                        )
+                self.push_once()
             self._stop.wait(settings.push_interval_seconds)
 
     # ---- pull (snapshot restore into immutable shard) --------------------
@@ -270,6 +269,18 @@ class SyncService:
         data_dir = Path(settings.shard_root) / settings.device_id
         data_dir.mkdir(parents=True, exist_ok=True)
 
+        # Nothing to pull until the collection exists on the server (created by
+        # the first push). Skip quietly to avoid noisy 404s on a fresh start.
+        client = self._server()
+        try:
+            if client is not None and not client.collection_exists(col):
+                return False
+        except Exception:
+            pass
+
+        event_id = metadata.start_sync_event()
+        start = time.perf_counter()
+        before = memory.stats().get("synced_points", 0)
         manifest = memory.snapshot_manifest()
         try:
             if manifest is None:
@@ -297,11 +308,20 @@ class SyncService:
             with self.state.lock:
                 self.state.last_error = str(exc)
             activity.record("error", "Pull failed", error=str(exc))
+            metadata.finish_sync_event(
+                event_id, 0, 0,
+                int((time.perf_counter() - start) * 1000), "failed",
+            )
             return False
 
+        after = memory.stats().get("synced_points", 0)
         with self.state.lock:
             self.state.last_pull = _now_iso()
-            self.state.pulled_total = memory.stats().get("synced_points", 0)
+            self.state.pulled_total = after
+        metadata.finish_sync_event(
+            event_id, 0, after,
+            int((time.perf_counter() - start) * 1000), "success",
+        )
         activity.record("sync", "Pulled snapshot into immutable shard")
         return True
 
