@@ -7,6 +7,7 @@ import SyncStatusPanel from "@/components/SyncStatusPanel";
 import MemoryInspector from "@/components/MemoryInspector";
 import SearchConsole from "@/components/SearchConsole";
 import ActivityLog from "@/components/ActivityLog";
+import ConflictsPanel from "@/components/ConflictsPanel";
 
 export default function Home() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
@@ -59,10 +60,17 @@ export default function Home() {
             Offline-first vector memory on Qdrant Edge · dual-shard merge search · cloud sync
           </div>
         </div>
-        <span className="pill">
-          <span className={`dot ${connected ? "on" : "off"}`} />
-          {connected ? "agent connected" : "agent down"}
-        </span>
+        <div className="header-right">
+          {status?.device && (
+            <span className="pill device-pill" title="This dashboard follows one edge device">
+              {status.device.id}
+            </span>
+          )}
+          <span className="pill">
+            <span className={`dot ${connected ? "on" : "off"}`} />
+            {connected ? "agent connected" : "agent down"}
+          </span>
+        </div>
       </header>
 
       <div className="grid">
@@ -70,6 +78,7 @@ export default function Home() {
         <SearchConsole />
         <SyncStatusPanel status={status} connected={connected} onAction={bump} />
         <ActivityLog events={events} />
+        <ConflictsPanel refreshKey={refreshKey} />
       </div>
     </>
   );

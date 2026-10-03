@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { StatusResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 
@@ -12,6 +12,8 @@ function ago(iso: string | null): string {
   return `${Math.round(secs / 3600)}h ago`;
 }
 
+const HISTORY_LEN = 40; // ~last few minutes at the 2s poll cadence
+
 export default function SyncStatusPanel({
   status,
   connected,
@@ -22,9 +24,29 @@ export default function SyncStatusPanel({
   onAction: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [history, setHistory] = useState<boolean[]>([]);
+  const lastPull = useRef<string | null>(null);
   const sync = status?.sync;
   const mem = status?.memory;
   const online = !!sync?.online;
+
+  // Track connectivity over time for the sparkline.
+  useEffect(() => {
+    setHistory((h) => [...h, connected && online].slice(-HISTORY_LEN));
+  }, [status, connected, online]);
+
+  // Briefly show a snapshot-restore indicator when last_pull advances.
+  useEffect(() => {
+    if (sync?.last_pull && sync.last_pull !== lastPull.current) {
+      if (lastPull.current !== null) {
+        setRestoring(true);
+        const t = window.setTimeout(() => setRestoring(false), 1800);
+        return () => window.clearTimeout(t);
+      }
+      lastPull.current = sync.last_pull;
+    }
+  }, [sync?.last_pull]);
 
   const toggleOffline = async () => {
     if (!sync) return;
@@ -49,11 +71,13 @@ export default function SyncStatusPanel({
 
   const doPull = async () => {
     setBusy(true);
+    setRestoring(true);
     try {
       await api.pull();
       onAction();
     } finally {
       setBusy(false);
+      window.setTimeout(() => setRestoring(false), 1200);
     }
   };
 
@@ -73,8 +97,24 @@ export default function SyncStatusPanel({
           {online ? "ONLINE" : "OFFLINE"}
         </span>
         {sync?.forced_offline && <span className="pill pending">forced offline</span>}
-        <span className="muted">device: {status?.device?.name ?? "—"}</span>
+        <span className="muted" style={{ marginLeft: "auto" }}>
+          device: <span className="mono">{status?.device?.id ?? "—"}</span>
+        </span>
       </div>
+
+      <div className="sparkline" title="connectivity over the last few minutes">
+        {history.map((up, i) => (
+          <span key={i} className={`spark ${up ? "up" : "down"}`} />
+        ))}
+        {!history.length && <span className="muted">tracking connectivity…</span>}
+      </div>
+
+      {restoring && (
+        <div className="restore-bar" title="Restoring immutable shard from server snapshot">
+          <div className="restore-fill" />
+          <span className="restore-label">restoring shard from snapshot…</span>
+        </div>
+      )}
 
       <div className="row" style={{ marginTop: 12, gap: 10 }}>
         <div className="stat">

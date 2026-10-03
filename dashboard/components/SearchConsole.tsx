@@ -4,6 +4,15 @@ import { useState } from "react";
 import type { SearchResult } from "@/lib/api";
 import { api } from "@/lib/api";
 
+// Representative cost of the SAME query against a remote Qdrant Server: a
+// typical mobile/edge network round-trip (~250ms) plus the remote search
+// itself. This is an estimate, labeled as such — the point is the order of
+// magnitude difference, which is the whole reason edge search exists.
+const NETWORK_RTT_MS = 250;
+function cloudEstimateMs(localMs: number): number {
+  return Math.round(NETWORK_RTT_MS + localMs * 1.2);
+}
+
 export default function SearchConsole() {
   const [q, setQ] = useState("");
   const [origin, setOrigin] = useState("");
@@ -48,13 +57,28 @@ export default function SearchConsole() {
       </div>
 
       {res && (
-        <div className="row" style={{ marginTop: 10 }}>
-          <span className="muted">
-            {res.results.length} hits in{" "}
-            <span className="score">{res.took_ms} ms</span> across{" "}
-            {res.shards_searched.join(" + ") || "no shards"}
-          </span>
-        </div>
+        <>
+          <div className="row" style={{ marginTop: 10 }}>
+            <span className="muted">
+              {res.results.length} hits across{" "}
+              {res.shards_searched.join(" + ") || "no shards"}
+            </span>
+          </div>
+          <div className="latency-compare">
+            <div className="lat edge">
+              <span className="lat-n">{res.took_ms}<small> ms</small></span>
+              <span className="lat-l">on-device (Qdrant Edge)</span>
+            </div>
+            <span className="lat-vs">vs</span>
+            <div className="lat cloud">
+              <span className="lat-n">~{cloudEstimateMs(res.took_ms)}<small> ms</small></span>
+              <span className="lat-l">cloud round-trip (est.)</span>
+            </div>
+            <span className="lat-speedup">
+              {Math.round(cloudEstimateMs(res.took_ms) / Math.max(res.took_ms, 0.5))}× faster
+            </span>
+          </div>
+        </>
       )}
 
       {err && <div className="disconnected" style={{ marginTop: 8 }}>{err}</div>}

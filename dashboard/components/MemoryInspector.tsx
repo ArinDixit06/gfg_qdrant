@@ -20,6 +20,7 @@ export default function MemoryInspector({
   const [priv, setPriv] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ reason: string; cloud: boolean } | null>(null);
 
   const load = async () => {
     try {
@@ -40,7 +41,10 @@ export default function MemoryInspector({
     if (!content.trim()) return;
     setBusy(true);
     try {
-      await api.ingest(content.trim(), category, priv);
+      const res = await api.ingest(content.trim(), category, priv);
+      // Surface WHY the policy routed this point, briefly and prominently.
+      setFlash({ reason: res.placement.reason, cloud: res.placement.sync_to_cloud });
+      window.setTimeout(() => setFlash(null), 5000);
       setContent("");
       setPriv(false);
       onIngest();
@@ -54,7 +58,12 @@ export default function MemoryInspector({
 
   return (
     <section className="panel">
-      <h2>Memory Inspector</h2>
+      <div className="panel-head">
+        <h2>Memory Inspector</h2>
+        <span className="model-badge" title="Embeddings run on-device via FastEmbed">
+          MiniLM-L6 · local · no API calls
+        </span>
+      </div>
 
       <div className="row">
         <input
@@ -100,6 +109,15 @@ export default function MemoryInspector({
           {points.length} points
         </span>
       </div>
+
+      {flash && (
+        <div className={`policy-flash ${flash.cloud ? "cloud" : "local"}`}>
+          <span className="policy-flash-tag">
+            {flash.cloud ? "→ cloud" : "stays local"}
+          </span>
+          <span>{flash.reason}</span>
+        </div>
+      )}
 
       {err && <div className="disconnected" style={{ marginTop: 8 }}>{err}</div>}
 

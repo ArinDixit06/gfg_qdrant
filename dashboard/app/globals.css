@@ -229,3 +229,207 @@ button:disabled {
   padding: 8px 10px;
   font-size: 12px;
 }
+
+/* ---- panel head (title + badge row) ---- */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.panel-head h2 {
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.device-pill {
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.model-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--green);
+  border: 1px solid var(--green);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* ---- edge vs cloud latency comparison (#5) ---- */
+.latency-compare {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.lat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lat-n {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+.lat-n small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.lat-l {
+  font-size: 10px;
+  color: var(--muted);
+}
+.lat.edge .lat-n { color: var(--green); }
+.lat.cloud .lat-n { color: var(--muted); }
+.lat-vs {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.lat-speedup {
+  margin-left: auto;
+  font-weight: 800;
+  color: var(--accent);
+  font-size: 14px;
+  background: rgba(79, 156, 255, 0.12);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+
+/* ---- policy routing flash (#4) ---- */
+.policy-flash {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  animation: flashIn 0.25s ease;
+}
+.policy-flash.cloud {
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid var(--green);
+}
+.policy-flash.local {
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid var(--purple);
+}
+.policy-flash-tag {
+  font-weight: 800;
+  white-space: nowrap;
+}
+.policy-flash.cloud .policy-flash-tag { color: var(--green); }
+.policy-flash.local .policy-flash-tag { color: var(--purple); }
+@keyframes flashIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- connectivity sparkline (#7) ---- */
+.sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 22px;
+  margin-top: 10px;
+  padding: 3px 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.spark {
+  width: 4px;
+  border-radius: 1px;
+}
+.spark.up { height: 100%; background: var(--green); }
+.spark.down { height: 35%; background: var(--red); }
+
+/* ---- snapshot restore progress (#7) ---- */
+.restore-bar {
+  position: relative;
+  margin-top: 10px;
+  height: 22px;
+  background: var(--panel-2);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.restore-fill {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.5;
+  animation: restoreSlide 1s linear infinite;
+}
+.restore-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text);
+}
+@keyframes restoreSlide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+/* ---- conflict mini-diff (#3) ---- */
+.diff {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.diff-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.diff-row.win {
+  background: rgba(52, 211, 153, 0.1);
+  border-left: 3px solid var(--green);
+}
+.diff-row.lose {
+  background: rgba(248, 113, 113, 0.08);
+  border-left: 3px solid var(--red);
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.diff-side {
+  font-weight: 700;
+  min-width: 46px;
+  color: var(--muted);
+}
+.diff-val {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .latency-compare {
+    flex-wrap: wrap;
+  }
+  .lat-speedup {
+    margin-left: 0;
+  }
+}
